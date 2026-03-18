@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Codice Civile Sistematico — Assistente Giuridico AI</title>
+    <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+    <header id="app-header">
+        <div class="header-left">
+            <h1>CODICE CIVILE SISTEMATICO</h1>
+            <span class="subtitle">Assistente Giuridico AI</span>
+        </div>
+        <div class="header-right">
+            <button id="theme-toggle" title="Cambia tema" aria-label="Cambia tema">
+                <span id="theme-icon">&#9790;</span>
+            </button>
+            <span id="llm-badge" class="badge badge-off" title="Stato LLM">LLM: --</span>
+        </div>
+    </header>
+
+    <!-- Ingestion progress banner -->
+    <div id="ingest-banner" class="ingest-banner hidden">
+        <div class="ingest-info">
+            <span id="ingest-message">Indicizzazione in corso...</span>
+            <span id="ingest-percent">0%</span>
+        </div>
+        <div class="progress-bar">
+            <div id="ingest-progress" class="progress-fill" style="width: 0%"></div>
+        </div>
+    </div>
+
+    <main id="app-main">
+        <!-- Sidebar: filters -->
+        <aside id="sidebar">
+            <div class="filter-section">
+                <h3>Modalita</h3>
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="search" checked>
+                    <span>Ricerca semantica</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="casistica">
+                    <span>Analisi casistica</span>
+                </label>
+                <label class="radio-label">
+                    <input type="radio" name="mode" value="articolo">
+                    <span>Cerca articolo</span>
+                </label>
+            </div>
+
+            <div class="filter-section">
+                <h3>Filtra per</h3>
+                <label for="filter-libro">Libro:</label>
+                <select id="filter-libro">
+                    <option value="">Tutti i Libri</option>
+                    <option value="LIBRO PRIMO">Libro I - Delle persone e della famiglia</option>
+                    <option value="LIBRO SECONDO">Libro II - Delle successioni</option>
+                    <option value="LIBRO TERZO">Libro III - Della proprieta</option>
+                    <option value="LIBRO QUARTO">Libro IV - Delle obbligazioni</option>
+                    <option value="LIBRO QUINTO">Libro V - Del lavoro</option>
+                    <option value="LIBRO SESTO">Libro VI - Della tutela dei diritti</option>
+                </select>
+
+                <label for="filter-tipo">Tipo contenuto:</label>
+                <select id="filter-tipo">
+                    <option value="">Tutti i tipi</option>
+                    <option value="norma">Norma</option>
+                    <option value="relazione">Relazione Grandi</option>
+                    <option value="giurisprudenza">Giurisprudenza</option>
+                    <option value="fonte_storica">Fonte storica</option>
+                </select>
+            </div>
+
+            <div class="filter-section">
+                <button id="btn-reset" class="btn btn-secondary">Reset filtri</button>
+            </div>
+
+            <div class="filter-section">
+                <h3>Cronologia</h3>
+                <ul id="history-list" class="history-list"></ul>
+            </div>
+        </aside>
+
+        <!-- Main content area -->
+        <section id="content-area">
+            <!-- Welcome message -->
+            <div id="welcome" class="welcome-card">
+                <h2>Benvenuto nell'Assistente Giuridico AI</h2>
+                <p>Puoi cercare articoli, analizzare casistiche giuridiche e consultare il Codice Civile Sistematico con l'aiuto dell'intelligenza artificiale.</p>
+                <div class="examples">
+                    <h4>Esempi di ricerca:</h4>
+                    <button class="example-btn" data-query="Cosa dice il codice civile sulla prescrizione dei crediti?" data-mode="casistica">Prescrizione dei crediti</button>
+                    <button class="example-btn" data-query="art. 1453" data-mode="articolo">Art. 1453 - Risoluzione del contratto</button>
+                    <button class="example-btn" data-query="usufrutto su immobile" data-mode="search">Usufrutto su immobile</button>
+                    <button class="example-btn" data-query="Il mio inquilino non paga l'affitto da 3 mesi. Posso risolvere il contratto?" data-mode="casistica">Inquilino moroso</button>
+                    <button class="example-btn" data-query="caparra confirmatoria" data-mode="search">Caparra confirmatoria</button>
+                </div>
+            </div>
+
+            <!-- Results area -->
+            <div id="results-area" class="hidden">
+                <!-- LLM Answer -->
+                <div id="llm-answer-card" class="answer-card hidden">
+                    <div class="answer-header">
+                        <h3>Risposta</h3>
+                        <button class="copy-btn" data-target="llm-answer-text" title="Copia risposta">&#128203;</button>
+                    </div>
+                    <div id="llm-answer-text" class="answer-text"></div>
+                </div>
+
+                <!-- Search results -->
+                <div id="search-results" class="results-grid"></div>
+            </div>
+
+            <!-- Loading spinner -->
+            <div id="loading" class="loading hidden">
+                <div class="spinner"></div>
+                <p>Ricerca in corso...</p>
+            </div>
+
+            <!-- Input bar -->
+            <div id="input-bar">
+                <input
+                    type="text"
+                    id="query-input"
+                    placeholder="Scrivi una domanda, un articolo (es. art. 1453) o una parola chiave..."
+                    autocomplete="off"
+                    maxlength="1000"
+                >
+                <button id="btn-search" class="btn btn-primary" title="Cerca">&#9654;</button>
+            </div>
+        </section>
+    </main>
+
+    <footer>
+        <p>Questa applicazione non costituisce consulenza legale. Per consulenza specifica, rivolgersi a un avvocato.</p>
+    </footer>
+
+    <script src="/static/app.js"></script>
+</body>
+</html>

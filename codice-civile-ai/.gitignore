@@ -1,0 +1,8 @@
+.env
+data/.session_token
+data/chroma_db/
+data/*.pdf
+__pycache__/
+*.pyc
+*.pyo
+.DS_Store
