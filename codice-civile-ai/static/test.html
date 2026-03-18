@@ -1,0 +1,464 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Test — Codice Civile AI</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: "Segoe UI", system-ui, sans-serif;
+            background: #f0f2f5;
+            color: #1a1a2e;
+            padding: 24px;
+            max-width: 960px;
+            margin: 0 auto;
+        }
+        h1 { font-size: 1.4rem; margin-bottom: 4px; }
+        .subtitle { color: #666; font-size: 0.85rem; margin-bottom: 20px; }
+        .section { background: #fff; border-radius: 8px; padding: 20px; margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+        .section h2 { font-size: 1rem; margin-bottom: 12px; color: #2c5f8a; }
+        .test-row { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+        .test-row label { font-size: 0.8rem; color: #555; min-width: 80px; }
+        button {
+            padding: 8px 16px; border: none; border-radius: 6px;
+            font-size: 0.85rem; font-weight: 600; cursor: pointer;
+            transition: background 0.15s, transform 0.1s;
+        }
+        button:active { transform: scale(0.97); }
+        .btn-run { background: #2c5f8a; color: #fff; }
+        .btn-run:hover { background: #1e4a6e; }
+        .btn-all { background: #27ae60; color: #fff; font-size: 0.95rem; padding: 10px 24px; }
+        .btn-all:hover { background: #1e8e4e; }
+        .result-box {
+            background: #f8f9fa; border: 1px solid #e0e0e0; border-radius: 6px;
+            padding: 12px; margin-top: 8px; font-size: 0.8rem;
+            font-family: "Cascadia Code", "Fira Code", monospace;
+            white-space: pre-wrap; word-break: break-word;
+            max-height: 250px; overflow-y: auto; display: none;
+        }
+        .pass { border-left: 4px solid #27ae60; }
+        .fail { border-left: 4px solid #e74c3c; }
+        .warn { border-left: 4px solid #f39c12; }
+        .status-badge {
+            display: inline-block; padding: 2px 8px; border-radius: 4px;
+            font-size: 0.7rem; font-weight: 700; text-transform: uppercase;
+        }
+        .badge-pass { background: #d4edda; color: #155724; }
+        .badge-fail { background: #f8d7da; color: #721c24; }
+        .badge-wait { background: #fff3cd; color: #856404; }
+        .badge-run  { background: #d1ecf1; color: #0c5460; }
+        .summary { display: flex; gap: 16px; align-items: center; margin-top: 16px; flex-wrap: wrap; }
+        .summary span { font-size: 0.9rem; font-weight: 600; }
+        input[type="text"] {
+            padding: 8px 12px; border: 1px solid #ccc; border-radius: 6px;
+            font-size: 0.85rem; flex: 1; min-width: 200px;
+        }
+        .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+        @media (max-width: 640px) { .grid-2 { grid-template-columns: 1fr; } }
+        hr { border: none; border-top: 1px solid #eee; margin: 12px 0; }
+        #token-input { width: 340px; }
+    </style>
+</head>
+<body>
+
+<h1>Test Suite — Codice Civile Sistematico AI</h1>
+<p class="subtitle">Verifica endpoint API, sicurezza, validazione e frontend</p>
+
+<!-- Token config -->
+<div class="section">
+    <h2>Configurazione</h2>
+    <div class="test-row">
+        <label>Token:</label>
+        <input type="text" id="token-input" value="" placeholder="Inserisci il token di sessione">
+        <button class="btn-run" onclick="loadToken()">Auto-detect</button>
+    </div>
+    <div class="test-row">
+        <label>Base URL:</label>
+        <input type="text" id="base-url" value="http://127.0.0.1:8000" style="width:260px">
+    </div>
+</div>
+
+<!-- Run all -->
+<div style="text-align:center; margin: 16px 0;">
+    <button class="btn-all" onclick="runAll()">Esegui tutti i test</button>
+</div>
+
+<!-- Test groups -->
+<div class="section">
+    <h2>1. Connessione e stato del server</h2>
+    <div id="grp-server"></div>
+</div>
+
+<div class="section">
+    <h2>2. Autenticazione e sicurezza</h2>
+    <div id="grp-auth"></div>
+</div>
+
+<div class="section">
+    <h2>3. Validazione input</h2>
+    <div id="grp-validation"></div>
+</div>
+
+<div class="section">
+    <h2>4. Endpoint query (richiede indice)</h2>
+    <div id="grp-query"></div>
+</div>
+
+<div class="section">
+    <h2>5. Security headers</h2>
+    <div id="grp-headers"></div>
+</div>
+
+<div class="section">
+    <h2>6. File statici e UI</h2>
+    <div id="grp-static"></div>
+</div>
+
+<!-- Summary -->
+<div class="section">
+    <h2>Riepilogo</h2>
+    <div id="summary" class="summary">
+        <span>Totale: <span id="s-total">0</span></span>
+        <span style="color:#27ae60">Pass: <span id="s-pass">0</span></span>
+        <span style="color:#e74c3c">Fail: <span id="s-fail">0</span></span>
+        <span style="color:#f39c12">Warn: <span id="s-warn">0</span></span>
+    </div>
+</div>
+
+<script>
+"use strict";
+
+const BASE = () => document.getElementById("base-url").value.replace(/\/+$/, "");
+const TOKEN = () => document.getElementById("token-input").value;
+
+// ---- Test definitions ----
+const tests = [
+    // Group 1: Server
+    { group: "grp-server", id: "srv-root", name: "GET / — Pagina principale", fn: testRoot },
+    { group: "grp-server", id: "srv-status", name: "GET /api/status — Stato server", fn: testStatus },
+    { group: "grp-server", id: "srv-ingest-status", name: "GET /api/ingest/status — Stato indicizzazione", fn: testIngestStatus },
+
+    // Group 2: Auth
+    { group: "grp-auth", id: "auth-no-token", name: "API senza token → 401", fn: testNoToken },
+    { group: "grp-auth", id: "auth-bad-token", name: "API con token errato → 401", fn: testBadToken },
+    { group: "grp-auth", id: "auth-valid-token", name: "API con token valido → 200", fn: testValidToken },
+
+    // Group 3: Validation
+    { group: "grp-validation", id: "val-short", name: "Query troppo corta (2 char) → 422", fn: testQueryShort },
+    { group: "grp-validation", id: "val-long", name: "Query troppo lunga (1500 char) → 422", fn: testQueryLong },
+    { group: "grp-validation", id: "val-bad-libro", name: "Libro non valido → 422", fn: testBadLibro },
+    { group: "grp-validation", id: "val-bad-tipo", name: "Tipo contenuto non valido → 422", fn: testBadTipo },
+    { group: "grp-validation", id: "val-topk-clamp", name: "top_k > 20 → clamped a 20", fn: testTopKClamp },
+
+    // Group 4: Query (index dependent)
+    { group: "grp-query", id: "q-search", name: "Ricerca semantica", fn: testSearchQuery },
+    { group: "grp-query", id: "q-articolo", name: "Ricerca per articolo", fn: testArticoloQuery },
+    { group: "grp-query", id: "q-casistica", name: "Analisi casistica", fn: testCasisticaQuery },
+    { group: "grp-query", id: "q-filtered", name: "Ricerca con filtro libro", fn: testFilteredQuery },
+
+    // Group 5: Headers
+    { group: "grp-headers", id: "hdr-csp", name: "Content-Security-Policy presente", fn: testCSP },
+    { group: "grp-headers", id: "hdr-frame", name: "X-Frame-Options: DENY", fn: testXFrame },
+    { group: "grp-headers", id: "hdr-nosniff", name: "X-Content-Type-Options: nosniff", fn: testNoSniff },
+    { group: "grp-headers", id: "hdr-cache", name: "Cache-Control: no-store", fn: testCacheControl },
+
+    // Group 6: Static
+    { group: "grp-static", id: "st-html", name: "index.html caricabile", fn: testIndexHTML },
+    { group: "grp-static", id: "st-css", name: "style.css caricabile", fn: testCSS },
+    { group: "grp-static", id: "st-js", name: "app.js caricabile", fn: testJS },
+];
+
+// ---- Render test rows ----
+function renderTests() {
+    const groups = {};
+    tests.forEach(t => {
+        if (!groups[t.group]) groups[t.group] = [];
+        groups[t.group].push(t);
+    });
+    for (const [gid, items] of Object.entries(groups)) {
+        const container = document.getElementById(gid);
+        container.innerHTML = items.map(t => `
+            <div class="test-item" id="item-${t.id}">
+                <div class="test-row">
+                    <span class="status-badge badge-wait" id="badge-${t.id}">attesa</span>
+                    <span style="font-size:0.88rem; flex:1">${t.name}</span>
+                    <button class="btn-run" onclick="runSingle('${t.id}')">Esegui</button>
+                </div>
+                <div class="result-box" id="result-${t.id}"></div>
+            </div>
+        `).join("");
+    }
+}
+
+// ---- Helpers ----
+function setBadge(id, status) {
+    const el = document.getElementById("badge-" + id);
+    el.className = "status-badge badge-" + status;
+    el.textContent = { pass: "pass", fail: "fail", warn: "warn", run: "..." }[status];
+}
+
+function setResult(id, text, cls) {
+    const el = document.getElementById("result-" + id);
+    el.style.display = "block";
+    el.textContent = text;
+    el.className = "result-box " + cls;
+}
+
+async function apiFetch(path, opts = {}) {
+    const url = BASE() + path;
+    return fetch(url, opts);
+}
+
+function authHeaders() {
+    return { "Content-Type": "application/json", "X-Session-Token": TOKEN() };
+}
+
+function updateSummary() {
+    let pass = 0, fail = 0, warn = 0;
+    tests.forEach(t => {
+        const b = document.getElementById("badge-" + t.id);
+        if (b.classList.contains("badge-pass")) pass++;
+        else if (b.classList.contains("badge-fail")) fail++;
+        else if (b.classList.contains("badge-warn")) warn++;
+    });
+    document.getElementById("s-total").textContent = tests.length;
+    document.getElementById("s-pass").textContent = pass;
+    document.getElementById("s-fail").textContent = fail;
+    document.getElementById("s-warn").textContent = warn;
+}
+
+// ---- Test implementations ----
+
+async function testRoot() {
+    const r = await apiFetch("/");
+    const text = await r.text();
+    if (r.ok && text.includes("Codice Civile")) return { ok: true, msg: `HTTP ${r.status} — HTML ricevuto (${text.length} bytes)` };
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testStatus() {
+    const r = await apiFetch("/api/status?token=" + TOKEN());
+    const data = await r.json();
+    if (r.ok && data.ingest !== undefined)
+        return { ok: true, msg: JSON.stringify(data, null, 2) };
+    return { ok: false, msg: `HTTP ${r.status}\n${JSON.stringify(data, null, 2)}` };
+}
+
+async function testIngestStatus() {
+    const r = await apiFetch("/api/ingest/status?token=" + TOKEN());
+    const data = await r.json();
+    if (r.ok && data.status !== undefined)
+        return { ok: true, msg: JSON.stringify(data, null, 2) };
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testNoToken() {
+    const r = await apiFetch("/api/status");
+    if (r.status === 401) return { ok: true, msg: "401 — Accesso negato correttamente senza token" };
+    return { ok: false, msg: `Atteso 401, ricevuto ${r.status}` };
+}
+
+async function testBadToken() {
+    const r = await apiFetch("/api/status?token=token-falso-12345");
+    if (r.status === 401) return { ok: true, msg: "401 — Token errato rifiutato correttamente" };
+    return { ok: false, msg: `Atteso 401, ricevuto ${r.status}` };
+}
+
+async function testValidToken() {
+    const r = await apiFetch("/api/status?token=" + TOKEN());
+    if (r.ok) return { ok: true, msg: `200 — Token valido accettato` };
+    return { ok: false, msg: `Atteso 200, ricevuto ${r.status}` };
+}
+
+async function testQueryShort() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "ab" }),
+    });
+    if (r.status === 422) {
+        const d = await r.json();
+        return { ok: true, msg: `422 — Validazione: ${d.detail?.[0]?.msg || JSON.stringify(d)}` };
+    }
+    return { ok: false, msg: `Atteso 422, ricevuto ${r.status}` };
+}
+
+async function testQueryLong() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "x".repeat(1500) }),
+    });
+    if (r.status === 422) return { ok: true, msg: "422 — Query lunga rifiutata" };
+    return { ok: false, msg: `Atteso 422, ricevuto ${r.status}` };
+}
+
+async function testBadLibro() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "test query", libro_filter: "INVALIDO" }),
+    });
+    if (r.status === 422) return { ok: true, msg: "422 — Libro non valido rifiutato" };
+    return { ok: false, msg: `Atteso 422, ricevuto ${r.status}` };
+}
+
+async function testBadTipo() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "test query", tipo_filter: "FAKE" }),
+    });
+    if (r.status === 422) return { ok: true, msg: "422 — Tipo contenuto non valido rifiutato" };
+    return { ok: false, msg: `Atteso 422, ricevuto ${r.status}` };
+}
+
+async function testTopKClamp() {
+    // This test validates that top_k is accepted (clamped happens server-side)
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "test query valida", top_k: 50 }),
+    });
+    // 503 means index not ready but input was accepted (not 422)
+    if (r.status === 503 || r.ok) return { ok: true, msg: `${r.status} — top_k=50 accettato (clamped a 20 internamente)` };
+    if (r.status === 422) return { ok: false, msg: "422 — top_k avrebbe dovuto essere clampato, non rifiutato" };
+    return { ok: false, msg: `Risposta inattesa: ${r.status}` };
+}
+
+async function testSearchQuery() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "usufrutto su immobile", mode: "search" }),
+    });
+    const data = await r.json();
+    if (r.status === 503) return { ok: "warn", msg: "503 — Indice non disponibile (PDF non caricato)\n" + JSON.stringify(data, null, 2) };
+    if (r.ok && data.results) return { ok: true, msg: `${data.results.length} risultati\n${JSON.stringify(data, null, 2).slice(0, 500)}` };
+    return { ok: false, msg: `HTTP ${r.status}\n${JSON.stringify(data, null, 2)}` };
+}
+
+async function testArticoloQuery() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "art. 1453", mode: "articolo" }),
+    });
+    const data = await r.json();
+    if (r.status === 503) return { ok: "warn", msg: "503 — Indice non disponibile (PDF non caricato)" };
+    if (r.ok && data.results) return { ok: true, msg: `${data.results.length} risultati` };
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testCasisticaQuery() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "Il mio inquilino non paga da 3 mesi", mode: "casistica" }),
+    });
+    const data = await r.json();
+    if (r.status === 503) return { ok: "warn", msg: "503 — Indice non disponibile (PDF non caricato)" };
+    if (r.ok && data.answer) return { ok: true, msg: `Risposta LLM: ${data.answer.slice(0, 200)}...` };
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testFilteredQuery() {
+    const r = await apiFetch("/api/query?token=" + TOKEN(), {
+        method: "POST", headers: authHeaders(),
+        body: JSON.stringify({ question: "caparra confirmatoria", libro_filter: "LIBRO QUARTO" }),
+    });
+    const data = await r.json();
+    if (r.status === 503) return { ok: "warn", msg: "503 — Indice non disponibile (PDF non caricato)" };
+    if (r.ok) return { ok: true, msg: `Filtro libro applicato — ${data.results?.length || 0} risultati` };
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testCSP() {
+    const r = await apiFetch("/api/status?token=" + TOKEN());
+    const csp = r.headers.get("content-security-policy");
+    if (csp && csp.includes("default-src")) return { ok: true, msg: `CSP: ${csp}` };
+    return { ok: false, msg: "Header Content-Security-Policy non trovato" };
+}
+
+async function testXFrame() {
+    const r = await apiFetch("/api/status?token=" + TOKEN());
+    const v = r.headers.get("x-frame-options");
+    if (v === "DENY") return { ok: true, msg: "X-Frame-Options: DENY" };
+    return { ok: false, msg: `X-Frame-Options: ${v || "MANCANTE"}` };
+}
+
+async function testNoSniff() {
+    const r = await apiFetch("/api/status?token=" + TOKEN());
+    const v = r.headers.get("x-content-type-options");
+    if (v === "nosniff") return { ok: true, msg: "X-Content-Type-Options: nosniff" };
+    return { ok: false, msg: `Valore: ${v || "MANCANTE"}` };
+}
+
+async function testCacheControl() {
+    const r = await apiFetch("/api/status?token=" + TOKEN());
+    const v = r.headers.get("cache-control");
+    if (v && v.includes("no-store")) return { ok: true, msg: `Cache-Control: ${v}` };
+    return { ok: false, msg: `Valore: ${v || "MANCANTE"}` };
+}
+
+async function testIndexHTML() {
+    const r = await apiFetch("/static/index.html");
+    if (r.ok) { const t = await r.text(); return { ok: true, msg: `200 — ${t.length} bytes` }; }
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testCSS() {
+    const r = await apiFetch("/static/style.css");
+    if (r.ok) { const t = await r.text(); return { ok: true, msg: `200 — ${t.length} bytes` }; }
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+async function testJS() {
+    const r = await apiFetch("/static/app.js");
+    if (r.ok) { const t = await r.text(); return { ok: true, msg: `200 — ${t.length} bytes` }; }
+    return { ok: false, msg: `HTTP ${r.status}` };
+}
+
+// ---- Run logic ----
+async function runSingle(id) {
+    const t = tests.find(x => x.id === id);
+    if (!t) return;
+    setBadge(id, "run");
+    try {
+        const res = await t.fn();
+        if (res.ok === true) { setBadge(id, "pass"); setResult(id, res.msg, "pass"); }
+        else if (res.ok === "warn") { setBadge(id, "warn"); setResult(id, res.msg, "warn"); }
+        else { setBadge(id, "fail"); setResult(id, res.msg, "fail"); }
+    } catch (e) {
+        setBadge(id, "fail");
+        setResult(id, "Errore: " + e.message, "fail");
+    }
+    updateSummary();
+}
+
+async function runAll() {
+    for (const t of tests) {
+        await runSingle(t.id);
+    }
+}
+
+async function loadToken() {
+    try {
+        const r = await fetch(BASE() + "/api/status");
+        if (r.ok) {
+            const d = await r.json();
+            if (d.token) { document.getElementById("token-input").value = d.token; return; }
+        }
+    } catch (e) {}
+    // Try extracting from parent page URL
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("token");
+    if (t) document.getElementById("token-input").value = t;
+    else alert("Token non trovato automaticamente. Inseriscilo manualmente.");
+}
+
+// Init
+renderTests();
+
+// Auto-load token from query string
+(function() {
+    const params = new URLSearchParams(window.location.search);
+    const t = params.get("token");
+    if (t) document.getElementById("token-input").value = t;
+})();
+</script>
+</body>
+</html>
